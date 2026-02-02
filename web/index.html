@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Portal Ciudadano - Demo OID4VC</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; flex: 1; min-width: 320px; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #ccc; background: #fafafa; cursor: pointer; }
+    button:hover { background: #f0f0f0; }
+    pre { background: #0b1020; color: #d9e2ff; padding: 12px; border-radius: 12px; overflow: auto; max-height: 200px; }
+    .status { font-weight: 600; }
+    .ok { color: #0a7a2f; }
+    .bad { color: #b00020; }
+    .wait { color: #8a6d00; }
+    .qr-container { text-align: center; padding: 16px 0; }
+    .qr-container canvas { border: 2px solid #ddd; border-radius: 12px; padding: 8px; background: white; }
+    .small { font-size: 13px; color: #666; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <h1>Portal Ciudadano — Demo (desktop → QR → móvil)</h1>
+  <p class="small">
+    Este demo genera QRs para <strong>emisión</strong> (Issuer) y <strong>verificación</strong> (Verifier).
+    Escanéalo con tu wallet móvil (Inji).
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h2>1) Emisión</h2>
+      <button id="btnIssue">Generar QR de emisión</button>
+      <p class="small">Escanea con la wallet para recibir la credencial.</p>
+      <div id="issueOut"></div>
+    </div>
+
+    <div class="card">
+      <h2>2) Verificación</h2>
+      <button id="btnVerify">Generar QR de verificación</button>
+      <p class="small">Escanea con la wallet para presentar VP (Access Gate).</p>
+      <div id="verifyOut"></div>
+      <div id="pollOut"></div>
+      <div id="meOut"></div>
+    </div>
+  </div>
+
+  <script>
+    function generateQR(containerId, text) {
+      // Clear previous QR if exists
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
+      // Generate QR code using qrcode.js library
+      new QRCode(container, {
+        text: text,
+        width: 300,
+        height: 300,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    async function postJSON(url) {
+      const res = await fetch(url, { method: "POST", headers: { "Accept": "application/json" } });
+      const txt = await res.text();
+      let data;
+      try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt}`);
+      return data;
+    }
+
+    async function getJSON(url) {
+      const res = await fetch(url, { headers: { "Accept": "application/json" } });
+      const txt = await res.text();
+      let data;
+      try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt}`);
+      return data;
+    }
+
+    let pollTimer = null;
+
+    document.getElementById("btnIssue").addEventListener("click", async () => {
+      const out = document.getElementById("issueOut");
+      out.innerHTML = "<p class='status wait'>Generando offer…</p>";
+      try {
+        const data = await postJSON("/demo/issue");
+        const offer = data.offer;
+        
+        const qrId = "issueQR_" + Date.now();
+        out.innerHTML = `
+          <p class="status ok">✅ QR listo para emisión</p>
+          <div class="qr-container" id="${qrId}"></div>
+          <p class="small">Escanea el QR arriba con tu wallet (Inji)</p>
+          <details><summary>Ver contenido (offer URI)</summary><pre>${offer}</pre></details>
+        `;
+        
+        generateQR(qrId, offer);
+      } catch (e) {
+        out.innerHTML = `<p class="status bad">Error: ${e.message}</p>`;
+      }
+    });
+
+    document.getElementById("btnVerify").addEventListener("click", async () => {
+      const out = document.getElementById("verifyOut");
+      const poll = document.getElementById("pollOut");
+      const me = document.getElementById("meOut");
+      out.innerHTML = "<p class='status wait'>Creando challenge…</p>";
+      poll.innerHTML = "";
+      me.innerHTML = "";
+
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+      try {
+        const data = await postJSON("/demo/verify");
+        const authRequest = data.authRequest;
+        const state = data.state;
+
+        const qrId = "verifyQR_" + Date.now();
+        out.innerHTML = `
+          <p class="status ok">✅ QR listo para verificación (state: <code>${state}</code>)</p>
+          <div class="qr-container" id="${qrId}"></div>
+          <p class="small">Escanea el QR arriba con tu wallet (Inji) para presentar la credencial</p>
+          <details><summary>Ver contenido (authorization request)</summary><pre>${authRequest}</pre></details>
+        `;
+        
+        generateQR(qrId, authRequest);
+
+        const startedAt = Date.now();
+        poll.innerHTML = `<p class="status wait">⏳ Esperando presentación de credencial…</p>`;
+
+        pollTimer = setInterval(async () => {
+          try {
+            const s = await getJSON(`/demo/session/${state}`);
+            const vr = s.verificationResult;
+
+            if (vr === true) {
+              clearInterval(pollTimer); pollTimer = null;
+              poll.innerHTML = `<p class="status ok">✅ Acceso concedido (verificationResult=true)</p>`;
+
+              // Try to fetch portal session info
+              try {
+                const meData = await getJSON("/demo/me");
+                me.innerHTML = `<details open><summary>Sesión del portal</summary><pre>${JSON.stringify(meData, null, 2)}</pre></details>`;
+              } catch (e) {
+                me.innerHTML = `<p class="small">Sesión creada, pero /demo/me no respondió (posible cookie Secure en HTTP local).</p>`;
+              }
+
+              return;
+            }
+
+            if (vr === false) {
+              clearInterval(pollTimer); pollTimer = null;
+              poll.innerHTML = `<p class="status bad">❌ Acceso denegado (verificationResult=false)</p>`;
+              return;
+            }
+
+            const elapsed = (Date.now() - startedAt) / 1000;
+            poll.innerHTML = `<p class="status wait">⏳ Esperando… (${elapsed.toFixed(0)}s)</p>`;
+          } catch (e) {
+            // keep polling but show transient errors
+            poll.innerHTML = `<p class="status wait">⏳ Esperando… (error: ${e.message})</p>`;
+          }
+        }, 1000);
+
+        // hard timeout
+        setTimeout(() => {
+          if (pollTimer) {
+            clearInterval(pollTimer); pollTimer = null;
+            poll.innerHTML = `<p class="status bad">⏱️ Timeout esperando VP (90s)</p>`;
+          }
+        }, 90000);
+
+      } catch (e) {
+        out.innerHTML = `<p class="status bad">Error: ${e.message}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
