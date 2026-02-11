@@ -44,6 +44,7 @@ func main() {
 	mux.HandleFunc("/demo/session", handler.CreateSessionHandler)
 	mux.HandleFunc("/demo/session/", handler.SessionHandler)
 	mux.HandleFunc("/demo/me", handler.MeHandler)
+	mux.HandleFunc("/demo/verifier-details", handler.VerifierDetailsHandler)
 
 	// Static file server for web assets
 	fs := http.FileServer(http.Dir("configs/web/"))

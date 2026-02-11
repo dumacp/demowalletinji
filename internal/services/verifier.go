@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -92,4 +93,41 @@ func (s *VerifierService) GetVerificationStatus(ctx context.Context, sessionID s
 		Status: "received",
 		Data:   string(respBody),
 	}, nil
+}
+
+// BaseURL returns the base URL of the verifier service
+func (s *VerifierService) BaseURL() string {
+	return s.config.BaseURL
+}
+
+// GetSession returns detailed session information from the verifier
+func (s *VerifierService) GetSession(ctx context.Context, sessionID string) (map[string]interface{}, error) {
+	url := fmt.Sprintf("%s%s/%s", s.config.BaseURL, s.config.SessionPath, sessionID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("session request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("session error %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	// Parse JSON response into a map for flexible handling
+	var sessionData map[string]interface{}
+	if err := json.Unmarshal(respBody, &sessionData); err != nil {
+		return nil, fmt.Errorf("failed to parse session response: %w", err)
+	}
+
+	return sessionData, nil
 }
