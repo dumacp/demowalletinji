@@ -64,21 +64,22 @@ type challenge struct {
 var verificationRequestPayload = map[string]any{
 	"request_credentials": []any{
 		map[string]any{
-			"format": "vc+sd-jwt",
+			"format": "vc+sd-jwt", // Cambio a dc+sd-jwt para compatibilidad con Lissi
 			"vct":    "https://issuer.devportal.nebulae.com.co/draft13/identity_credential",
 			"input_descriptor": map[string]any{
 				"id":     "citizen-access",
 				"format": map[string]any{"vc+sd-jwt": map[string]any{}},
+				// "format": map[string]any{"vc+sd-jwt": map[string]any{"alg": []string{"EdDSA"}}},
 				"constraints": map[string]any{
 					"limit_disclosure": "required",
 					"fields": []any{
-						map[string]any{
-							"path": []any{"$.vct"},
-							"filter": map[string]any{
-								"type":    "string",
-								"pattern": "https://issuer.devportal.nebulae.com.co/draft13/identity_credential",
-							},
-						},
+						// map[string]any{
+						// 	"path": []any{"$.vct"},
+						// 	"filter": map[string]any{
+						// 		"type":    "string",
+						// 		"pattern": "https://issuer.devportal.nebulae.com.co/draft13/identity_credential",
+						// 	},
+						// },
 						map[string]any{
 							"path": []any{"$.citizen_status"},
 							"filter": map[string]any{
@@ -98,7 +99,8 @@ var verificationRequestPayload = map[string]any{
 			},
 		},
 	},
-	"vp_policies": []any{"signature_sd-jwt-vc", "presentation-definition"},
+	// "vp_policies": []any{"signature_sd-jwt-vc", "presentation-definition"},
+	"vp_policies": []any{"presentation-definition"},
 	"vc_policies": []any{"not-before", "expired"},
 }
 
@@ -149,6 +151,83 @@ func extractClientIDFromRequestJWT(jwt string) (string, error) {
 		return v, nil
 	}
 	return "", fmt.Errorf("client_id not found in jwt payload")
+}
+
+// convertHTTPSClientIDtoDID converts an HTTPS client_id to DID format
+// Example: https://verifier.demo.walt.id/openid4vc/verify -> did:web:verifier.demo.walt.id:openid4vc:verify
+func convertHTTPSClientIDtoDID(clientID string) string {
+	// Only convert if it's an HTTPS URL
+	if !strings.HasPrefix(clientID, "https://") {
+		return clientID
+	}
+
+	// Parse the URL
+	u, err := url.Parse(clientID)
+	if err != nil {
+		return clientID
+	}
+
+	// Start building DID
+	did := "did:web:" + u.Host
+
+	// Add path segments (skip empty ones)
+	if u.Path != "" && u.Path != "/" {
+		pathParts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		for _, part := range pathParts {
+			if part != "" {
+				did += ":" + part
+			}
+		}
+	}
+
+	return did
+}
+
+// extractClientIDFromOpenID4VP extracts client_id from openid4vp:// URL
+// Example: openid4vp://authorize?client_id=https%3A%2F%2Fverifier.demo.walt.id%2Fopenid4vc%2Fverify&request_uri=...
+func extractClientIDFromOpenID4VP(openidURL string) (string, error) {
+	if !strings.HasPrefix(openidURL, "openid4vp://") {
+		return "", fmt.Errorf("not an openid4vp URL")
+	}
+
+	// Parse the URL
+	u, err := url.Parse(openidURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse openid4vp URL: %w", err)
+	}
+
+	// Get client_id from query parameters
+	clientID := u.Query().Get("client_id")
+	if clientID == "" {
+		return "", fmt.Errorf("client_id not found in URL")
+	}
+
+	return clientID, nil
+}
+
+// replaceClientIDInOpenID4VP replaces the client_id parameter in an openid4vp:// URL with a new value
+// Example: replaces client_id in openid4vp://authorize?client_id=https%3A%2F%2Fverifier.demo.walt.id%2Fopenid4vc%2Fverify&request_uri=...
+func replaceClientIDInOpenID4VP(openidURL string, newClientID string) (string, error) {
+	if !strings.HasPrefix(openidURL, "openid4vp://") {
+		return "", fmt.Errorf("not an openid4vp URL")
+	}
+
+	// Parse the URL
+	u, err := url.Parse(openidURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse openid4vp URL: %w", err)
+	}
+
+	// Get query parameters
+	q := u.Query()
+
+	// Replace client_id with new value
+	q.Set("client_id", newClientID)
+
+	// Rebuild the URL with updated query parameters
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
 }
 
 func buildInjiOID4VPAuthRequest(clientID string, requestURI string) (string, error) {
@@ -260,7 +339,8 @@ func parseVerifierResponse(respBody []byte) verifyResp {
 		if strings.HasPrefix(rawStr, "openid4vp://") {
 			// Response is a direct URI; extract state from the query parameters
 			vr.AuthorizationRequest = rawStr
-			// Parse state from the URI
+
+			// First try to parse state from the URI query parameters
 			if idx := strings.Index(rawStr, "state="); idx != -1 {
 				stateStart := idx + 6 // len("state=")
 				stateEnd := strings.IndexAny(rawStr[stateStart:], "&")
@@ -268,6 +348,28 @@ func parseVerifierResponse(respBody []byte) verifyResp {
 					vr.State = rawStr[stateStart:]
 				} else {
 					vr.State = rawStr[stateStart : stateStart+stateEnd]
+				}
+			}
+
+			// If state not found in query params, try to extract from request_uri
+			if vr.State == "" {
+				if idx := strings.Index(rawStr, "request_uri="); idx != -1 {
+					requestURIStart := idx + 12 // len("request_uri=")
+					requestURIEnd := strings.IndexAny(rawStr[requestURIStart:], "&")
+					var requestURI string
+					if requestURIEnd == -1 {
+						requestURI = rawStr[requestURIStart:]
+					} else {
+						requestURI = rawStr[requestURIStart : requestURIStart+requestURIEnd]
+					}
+
+					// URL decode the request_uri
+					if decodedURI, err := url.QueryUnescape(requestURI); err == nil {
+						// Extract state from the last part of the path
+						if lastSlash := strings.LastIndex(decodedURI, "/"); lastSlash != -1 {
+							vr.State = decodedURI[lastSlash+1:]
+						}
+					}
 				}
 			}
 			return vr
@@ -461,6 +563,7 @@ func (s *server) handleVerify() http.HandlerFunc {
 			http.Error(w, "failed to marshal verification request", http.StatusInternalServerError)
 			return
 		}
+		fmt.Printf("Verification request payload: %s\n", string(b))
 
 		ctx, cancel := context.WithTimeout(r.Context(), verifyRequestTimeout)
 		defer cancel()
@@ -471,7 +574,9 @@ func (s *server) handleVerify() http.HandlerFunc {
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("openId4VPProfile", "ISO_18013_7_MDOC")
+		req.Header.Set("openId4VPProfile", "DEFAULT")
+		req.Header.Set("responseMode", "direct_post")
+		req.Header.Set("authorizeBaseUrl", "openid4vp://authorize")
 		req.Header.Set("Accept", "application/json")
 
 		resp, err := s.httpc.Do(req)
@@ -488,70 +593,79 @@ func (s *server) handleVerify() http.HandlerFunc {
 			return
 		}
 
-		vr := parseVerifierResponse(respBody)
+		respBodyTest := []byte("openid4vp://authorize?client_id=https%3A%2F%2Fverifier.demo.walt.id%2Fopenid4vc%2Fverify&request_uri=https%3A%2F%2Fverifier.demo.walt.id%2Fopenid4vc%2Frequest%2FyzNneSip4DwQ")
 
 		fmt.Printf("respBody: %s\n", string(respBody))
+		fmt.Printf("respBody: %s\n", string(respBodyTest))
+
+		vr := parseVerifierResponse(respBody)
+
+		// vr1 := parseVerifierResponse(respBodyTest)
 
 		if vr.State == "" || vr.AuthorizationRequest == "" {
 			http.Error(w, "unexpected verifier response: "+string(respBody), http.StatusBadGateway)
 			return
 		}
 
-		// 4) GET /openid4vc/request/{state} -> JWT firmado (request object)
-		requestURI := verifierBase + "/openid4vc/request/" + url.PathEscape(vr.State)
-		jwtResp, err := http.NewRequest(http.MethodGet, requestURI, nil)
-		if err != nil {
-			http.Error(w, "failed to create request_uri call", http.StatusInternalServerError)
-			return
-		}
-		jwtResp.Header.Set("accept", "*/*")
+		// // 4) GET /openid4vc/request/{state} -> JWT firmado (request object)
+		// requestURI := verifierBase + "/openid4vc/request/" + url.PathEscape(vr.State)
+		// jwtResp, err := http.NewRequest(http.MethodGet, requestURI, nil)
+		// if err != nil {
+		// 	http.Error(w, "failed to create request_uri call", http.StatusInternalServerError)
+		// 	return
+		// }
+		// jwtResp.Header.Set("accept", "*/*")
 
-		jwtHTTPResp, err := s.httpc.Do(jwtResp)
-		if err != nil {
-			http.Error(w, "failed to fetch verifier request object: "+err.Error(), http.StatusBadGateway)
-			return
-		}
-		defer jwtHTTPResp.Body.Close()
-		jwtBytes, _ := io.ReadAll(jwtHTTPResp.Body)
-		if jwtHTTPResp.StatusCode < 200 || jwtHTTPResp.StatusCode >= 300 {
-			http.Error(w, "verifier /request/{id} error: "+string(jwtBytes), http.StatusBadGateway)
-			return
-		}
+		// jwtHTTPResp, err := s.httpc.Do(jwtResp)
+		// if err != nil {
+		// 	http.Error(w, "failed to fetch verifier request object: "+err.Error(), http.StatusBadGateway)
+		// 	return
+		// }
+		// defer jwtHTTPResp.Body.Close()
+		// jwtBytes, _ := io.ReadAll(jwtHTTPResp.Body)
+		// if jwtHTTPResp.StatusCode < 200 || jwtHTTPResp.StatusCode >= 300 {
+		// 	http.Error(w, "verifier /request/{id} error: "+string(jwtBytes), http.StatusBadGateway)
+		// 	return
+		// }
 
-		requestJWT := strings.TrimSpace(string(jwtBytes))
+		// requestJWT := strings.TrimSpace(string(jwtBytes))
 
 		// 5) tomar client_id del JWT (no verificamos firma; solo leer claim)
-		clientID, err := extractClientIDFromRequestJWT(requestJWT)
+		// clientID, err := extractClientIDFromRequestJWT(requestJWT)
+		// if err != nil {
+		// 	http.Error(w, "failed to extract client_id from request jwt: "+err.Error(), http.StatusBadGateway)
+		// 	return
+		// }
+
+		requestURI := vr.AuthorizationRequest
+
+		// 5) extraer client_id del requestURI
+		clientID, err := extractClientIDFromOpenID4VP(requestURI)
 		if err != nil {
-			http.Error(w, "failed to extract client_id from request jwt: "+err.Error(), http.StatusBadGateway)
+			http.Error(w, "failed to extract client_id from requestURI: "+err.Error(), http.StatusBadGateway)
 			return
 		}
 
-		// 6) construir authRequest compatible con Inji (client_id + request_uri)
-		authForInji, err := buildInjiOID4VPAuthRequest(clientID, requestURI)
+		// 6) convertir client_id a formato DID para compatibilidad con Inji
+		didClientID := convertHTTPSClientIDtoDID(clientID)
+
+		// 7) crear nuevo authRequest reemplazando client_id con el formato DID
+		authForInji, err := replaceClientIDInOpenID4VP(requestURI, didClientID)
 		if err != nil {
-			http.Error(w, "failed to build inji authRequest: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to replace client_id in authRequest: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Printf("Built Inji authRequest: %s\n", authForInji)
-
-		fmt.Printf("verifier response: %s\n", vr.AuthorizationRequest)
+		fmt.Printf("Original clientID: %s\n", clientID)
+		fmt.Printf("DID clientID: %s\n", didClientID)
+		fmt.Printf("Original authRequest: %s\n", vr.AuthorizationRequest)
+		fmt.Printf("Modified authRequest for Lissi: %s\n", authForInji)
 
 		s.storeChallenge(vr.State)
 
-		// // 8) responder al frontend
-		// jsonWrite(w, 200, map[string]any{
-		// 	"state":       vr.State,
-		// 	"authRequest": authForInji, // ESTE es el que debe ir al QR
-		// 	"request_uri": requestURI,
-		// 	"client_id":   clientID,
-		// 	// opcional: por debug
-		// 	// "auth_plain": authPlain,
-		// })
-
+		// 8) responder al frontend con client_id transformado para Lissi
 		jsonWrite(w, 200, map[string]any{
 			"state":       vr.State,
-			"authRequest": vr.AuthorizationRequest,
+			"authRequest": vr.AuthorizationRequest, // ESTE es el que debe ir al QR para Lissi también
 			"sessionUrl":  sessionURLFromState(vr.State, vr.SessionUrl),
 		})
 
