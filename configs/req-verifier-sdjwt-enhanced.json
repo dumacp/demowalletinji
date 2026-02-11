@@ -1,0 +1,92 @@
+{
+  "openId4VPProfile": "DEFAULT",
+  "request_credentials": [
+    {
+      "format": "vc+sd-jwt",
+      "vct": "identity_credential",
+      "input_descriptor": {
+        "id": "identity_credential",
+        "format": {
+          "vc+sd-jwt": {
+            "sd-jwt_alg_values": ["EdDSA", "ES256"]
+          }
+        },
+        "constraints": {
+          "limit_disclosure": "required",
+          "fields": [
+            {
+              "path": ["$.given_name"],
+              "filter": {},
+              "purpose": "Verificar nombre del ciudadano"
+            },
+            {
+              "path": ["$.family_name"],
+              "filter": {},
+              "purpose": "Verificar apellido del ciudadano"
+            },
+            {
+              "path": ["$.email"],
+              "filter": {},
+              "purpose": "Verificar email del cidadano"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "vp_policies": [
+    {
+      "policy": "signature_sd-jwt-vc",
+      "description": "Verify cryptographic signature of SD-JWT-VC presentation"
+    },
+    {
+      "policy": "minimum-credentials",
+      "args": 1,
+      "description": "Require at least 1 credential in presentation"
+    },
+    {
+      "policy": "holder-binding",
+      "description": "Verify that VP presenter is the subject of all VCs"
+    }
+  ],
+  "vc_policies": [
+    {
+      "policy": "signature",
+      "description": "Verify cryptographic signature of credential"
+    },
+    {
+      "policy": "not-before",
+      "description": "Check that credential is not used before its valid date"
+    },
+    {
+      "policy": "expired", 
+      "description": "Check that credential has not expired"
+    },
+    {
+      "policy": "revoked-status-list",
+      "description": "Check credential revocation status"
+    },
+    {
+      "policy": "allowed-issuer",
+      "args": [
+        "did:key:z6MkoLzFfMmVhfQpZZJHFh4TRdNEUbJ8z4PzE4uxFVYYhx8C",
+        "did:web:devportal.nebulae.com.co:issuers:devportal",
+        "did:key:zDnaeqgdw7qN5J8qZbwo8PCu18he2bK7PSHfaQEhmTw4xrDCC",
+        "did:key:zDnaeW7p9QEsvutCEpWetgrcuTwLhVbMm9HTDUEPTjJ5yvZ9b"
+      ],
+      "description": "Only accept credentials from trusted issuers"
+    }
+  ],
+  "presentationID": "verification_session_$RANDOM_ID",
+  "metadata": {
+    "description": "Enhanced credential verification with signature validation and issuer trust",
+    "required_validations": [
+      "cryptographic_signature",
+      "temporal_validity", 
+      "issuer_trust",
+      "revocation_status",
+      "holder_binding"
+    ],
+    "security_level": "high"
+  }
+}
