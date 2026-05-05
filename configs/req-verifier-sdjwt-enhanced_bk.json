@@ -13,19 +13,21 @@
         },
         "constraints": {
           "limit_disclosure": "required",
-          "fields": [           
+          "fields": [
+            {
+              "path": ["$.given_name"],
+              "filter": {},
+              "purpose": "Verificar nombre del ciudadano"
+            },
+            {
+              "path": ["$.family_name"],
+              "filter": {},
+              "purpose": "Verificar apellido del ciudadano"
+            },
             {
               "path": ["$.email"],
               "filter": {},
-              "purpose": "Verificar email del ciudadano"
-            },
-            {
-                "path": ["$.is_over_18"],
-                "filter": {
-                    "type": "boolean",
-                    "const": true
-                },
-                "purpose": "Verificar que el ciudadano es mayor de 18 años"
+              "purpose": "Verificar email del cidadano"
             }
           ]
         }

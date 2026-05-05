@@ -6,41 +6,292 @@
   <title>Portal Ciudadano - Demo OID4VC</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; flex: 1; min-width: 320px; }
-    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #ccc; background: #fafafa; cursor: pointer; }
-    button:hover { background: #f0f0f0; }
-    pre { background: #0b1020; color: #d9e2ff; padding: 12px; border-radius: 12px; overflow: auto; max-height: 200px; }
-    .status { font-weight: 600; }
-    .ok { color: #0a7a2f; }
-    .bad { color: #b00020; }
-    .wait { color: #8a6d00; }
-    .qr-container { text-align: center; padding: 16px 0; }
-    .qr-container canvas { border: 2px solid #ddd; border-radius: 12px; padding: 8px; background: white; }
+    /* === RESPONSIVE BASE === */
+    * { box-sizing: border-box; }
+    body { 
+      font-family: system-ui, sans-serif; 
+      max-width: 980px; 
+      margin: 24px auto; 
+      padding: 0 16px;
+      background: #f8f9fa;
+    }
+    
+    /* === RESPONSIVE GRID === */
+    .row { 
+      display: flex; 
+      gap: 16px; 
+      flex-wrap: wrap; 
+    }
+    .card { 
+      border: 1px solid #ddd; 
+      border-radius: 12px; 
+      padding: 20px; 
+      flex: 1; 
+      min-width: 320px;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* === BUTTONS === */
+    button { 
+      padding: 12px 16px; 
+      border-radius: 8px; 
+      border: 1px solid #007acc; 
+      background: #007acc; 
+      color: white;
+      cursor: pointer; 
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      width: 100%;
+    }
+    button:hover { 
+      background: #005a9e; 
+      border-color: #005a9e;
+    }
+    
+    /* === FORM STYLING === */
+    .form-group { 
+      margin: 16px 0; 
+    }
+    .form-row { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 12px; 
+    }
+    .form-row-3 { 
+      display: grid; 
+      grid-template-columns: 1fr 1fr 1fr; 
+      gap: 12px; 
+    }
+    
+    /* === INPUT STYLING === */
+    input, select { 
+      width: 100%;
+      padding: 12px; 
+      border: 2px solid #e1e5e9; 
+      border-radius: 8px; 
+      font-size: 16px; /* Evita zoom en iOS */
+      background: white;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { 
+      outline: none; 
+      border-color: #007acc; 
+      box-shadow: 0 0 0 3px rgba(0,122,204,0.1);
+    }
+    
+    label { 
+      display: block; 
+      font-size: 14px; 
+      font-weight: 600; 
+      margin-bottom: 6px; 
+      color: #333;
+    }
+    
+    .calculated { 
+      background: #f8f9fa; 
+      color: #6c757d; 
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    /* === STATUS & MESSAGES === */
+    pre { background: #0b1020; color: #d9e2ff; padding: 12px; border-radius: 8px; overflow: auto; max-height: 200px; }
+    .status { font-weight: 600; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .ok { color: #155724; background: #d4edda; border: 1px solid #c3e6cb; }
+    .bad { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
+    .wait { color: #856404; background: #fff3cd; border: 1px solid #ffeaa7; }
+    
+    /* === QR STYLING === */
+    .qr-container { text-align: center; padding: 20px 0; }
+    .qr-container canvas { 
+      border: 2px solid #ddd; 
+      border-radius: 12px; 
+      padding: 8px; 
+      background: white; 
+      max-width: 100%;
+      height: auto;
+    }
+    
     .small { font-size: 13px; color: #666; }
     a { color: inherit; }
+    
+    /* === MOBILE RESPONSIVENESS === */
+    @media (max-width: 768px) {
+      body { 
+        margin: 12px auto; 
+        padding: 0 12px; 
+      }
+      
+      .card { 
+        min-width: unset;
+        padding: 16px;
+        margin: 0 0 16px 0;
+      }
+      
+      .row { 
+        flex-direction: column;
+        gap: 0;
+      }
+      
+      /* Stack form fields on mobile */
+      .form-row,
+      .form-row-3 { 
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+      
+      /* Better button size on mobile */
+      button { 
+        padding: 14px 16px;
+        font-size: 16px;
+      }
+    }
+    
+    /* === SMALL MOBILE (< 480px) === */
+    @media (max-width: 480px) {
+      body { 
+        padding: 0 8px; 
+      }
+      
+      .card { 
+        padding: 12px;
+      }
+      
+      input, select { 
+        padding: 10px;
+        font-size: 16px; /* Mantén 16px para evitar zoom */
+      }
+      
+      .form-group { 
+        margin: 12px 0; 
+      }
+      
+      h1 { 
+        font-size: 20px;
+        text-align: center;
+      }
+    }
+    
+    /* === WIDE SCREENS === */
+    @media (min-width: 1200px) {
+      body { 
+        max-width: 1200px; 
+      }
+      
+      .form-row-3 { 
+        grid-template-columns: 1fr 1fr 1fr; 
+      }
+    }
   </style>
 </head>
 <body>
   <h1>Portal Ciudadano — Demo (desktop → QR → móvil)</h1>
   <p class="small">
     Este demo genera QRs para <strong>emisión</strong> (Issuer) y <strong>verificación</strong> (Verifier).
-    Escanéalo con tu wallet móvil (Inji).
+    Escanéalo con tu wallet móvil <a href="https://www.lissi.id/eudi-wallet-demo-start" target="_blank" rel="noopener noreferrer">Lissi</a>.
   </p>
 
   <div class="row">
     <div class="card">
       <h2>1) Emisión</h2>
-      <button id="btnIssue">Generar QR de emisión</button>
-      <p class="small">Escanea con la wallet para recibir la credencial.</p>
+      <p class="small">Complete los datos para generar su credencial personalizada:</p>
+      
+      <form id="userForm">
+        <!-- Información Personal -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="given_name">✅ Nombre:</label>
+            <input type="text" id="given_name" name="given_name" required placeholder="Camilo" autocomplete="given-name">
+          </div>
+          <div class="form-group">
+            <label for="family_name">✅ Apellido:</label>
+            <input type="text" id="family_name" name="family_name" required placeholder="Nebulae" autocomplete="family-name">
+          </div>
+        </div>
+
+        <!-- Contacto -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">📧 Email:</label>
+            <input type="email" id="email" name="email" required placeholder="usuario@example.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="phone_number">📱 Teléfono:</label>
+            <input type="tel" id="phone_number" name="phone_number" required placeholder="+57-900-200-7654" autocomplete="tel">
+          </div>
+        </div>
+
+        <!-- Edad -->
+        <div class="form-group">
+          <label for="birthdate">📅 Fecha de Nacimiento:</label>
+          <input type="date" id="birthdate" name="birthdate" required autocomplete="bday">
+          <div style="display:none; margin-top:8px;" id="ageInfo">
+            <div class="calculated">
+              📊 <strong>Edad calculada:</strong> <span id="calculatedAge"></span> años<br>
+              <small><span id="ageFlags"></span></small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="form-group">
+          <label for="street_address">🏠 Dirección:</label>
+          <input type="text" id="street_address" name="street_address" required placeholder="Calle 123 #45-67" autocomplete="street-address">
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="locality">🏙️ Ciudad:</label>
+            <input type="text" id="locality" name="locality" required placeholder="Bogotá" autocomplete="address-level2">
+          </div>
+          <div class="form-group">
+            <label for="region">🗺️ Departamento:</label>
+            <select id="region" name="region" required autocomplete="address-level1">
+              <option value="">Seleccionar...</option>
+              <option value="Antioquia">Antioquia</option>
+              <option value="Bogotá D.C.">Bogotá D.C.</option>
+              <option value="Valle del Cauca">Valle del Cauca</option>
+              <option value="Cundinamarca">Cundinamarca</option>
+              <option value="Atlántico">Atlántico</option>
+              <option value="Santander">Santander</option>
+              <option value="Norte de Santander">Norte de Santander</option>
+              <option value="Tolima">Tolima</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="country">🌍 País:</label>
+            <select id="country" name="country" required autocomplete="country">
+              <option value="CO">🇨🇴 Colombia</option>
+              <option value="PE">🇵🇪 Perú</option>
+              <option value="VE">🇻🇪 Venezuela</option>
+            </select>
+          </div>
+        </div>
+      </form>
+
+      <div style="margin-top: 20px;">
+        <button id="btnIssue">🎯 Generar Credencial Personalizada</button>
+        <p class="small" style="margin-top: 8px; text-align: center;">
+          📱 Complete el formulario y genere su credencial única.<br>
+          🔒 <strong>Las verificaciones de edad se calculan de forma segura en el servidor</strong>
+        </p>
+      </div>
       <div id="issueOut"></div>
     </div>
 
     <div class="card">
-      <h2>2) Verificación</h2>
-      <button id="btnVerify">Generar QR de verificación</button>
-      <p class="small">Escanea con la wallet para presentar VP (Access Gate).</p>
+      <h2>🔍 2) Verificación</h2>
+      <button id="btnVerify">🔎 Generar QR de Verificación</button>
+      <p class="small" style="text-align: center; margin-top: 8px;">
+        📲 Escanea con tu wallet para presentar tu credencial
+      </p>
       <div id="verifyOut"></div>
       <div id="pollOut"></div>
       <div id="meOut"></div>
@@ -84,18 +335,122 @@
 
     let pollTimer = null;
 
+    // Función para calcular edad y flags is_over_X
+    function calculateAge(birthdate) {
+      const today = new Date();
+      const birth = new Date(birthdate);
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      
+      return {
+        age,
+        is_over_18: age >= 18,
+        is_over_21: age >= 21,
+        is_over_65: age >= 65
+      };
+    }
+
+    // Event listener para calcular edad en tiempo real
+    document.getElementById("birthdate").addEventListener("change", (e) => {
+      const birthdate = e.target.value;
+      if (birthdate) {
+        const ageData = calculateAge(birthdate);
+        const ageInfo = document.getElementById("ageInfo");
+        const calculatedAge = document.getElementById("calculatedAge");
+        const ageFlags = document.getElementById("ageFlags");
+        
+        calculatedAge.textContent = ageData.age;
+        
+        const flags = [];
+        if (ageData.is_over_18) flags.push("✅ +18");
+        if (ageData.is_over_21) flags.push("✅ +21");
+        if (ageData.is_over_65) flags.push("✅ +65");
+        if (flags.length === 0) flags.push("❌ Menor de edad");
+        
+        ageFlags.textContent = flags.join(" | ");
+        ageInfo.style.display = "block";
+      }
+    });
+
+    // Función para validar formulario y recopilar datos
+    function getFormData() {
+      const form = document.getElementById("userForm");
+      const formData = new FormData(form);
+      const data = {};
+      
+      for (let [key, value] of formData.entries()) {
+        data[key] = value;
+      }
+      
+      // ✅ SECURITY FIX: NO calcular is_over_X en frontend
+      // El backend calculará estos valores de forma segura
+      
+      // Estructurar dirección
+      data.address = {
+        street_address: data.street_address,
+        locality: data.locality,
+        region: data.region,
+        country: data.country
+      };
+      
+      // Limpiar campos que ya están en address
+      delete data.street_address;
+      delete data.locality;
+      delete data.region;
+      delete data.country;
+      
+      return data;
+    }
+
     document.getElementById("btnIssue").addEventListener("click", async () => {
       const out = document.getElementById("issueOut");
-      out.innerHTML = "<p class='status wait'>Generando offer…</p>";
+      const form = document.getElementById("userForm");
+      
+      // Validar formulario
+      if (!form.checkValidity()) {
+        out.innerHTML = "<p class='status bad'>❌ Por favor complete todos los campos requeridos</p>";
+        form.reportValidity();
+        return;
+      }
+      
+      out.innerHTML = "<p class='status wait'>Generando offer personalizado…</p>";
       try {
-        const data = await postJSON("/demo/issue");
+        const formData = getFormData();
+        
+        // Enviar datos del formulario al backend
+        const res = await fetch("/demo/issue", { 
+          method: "POST", 
+          headers: { 
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(formData)
+        });
+        
+        const txt = await res.text();
+        let data;
+        try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt}`);
+        
         const offer = data.offer;
         
         const qrId = "issueQR_" + Date.now();
         out.innerHTML = `
-          <p class="status ok">✅ QR listo para emisión</p>
+          <p class="status ok">✅ QR listo para emisión personalizada</p>
+          <div style="margin:8px 0; padding:8px; background:#f0f8ff; border-radius:6px; font-size:12px;">
+            <strong>📋 Datos de la credencial:</strong><br>
+            👤 ${formData.given_name} ${formData.family_name}<br>
+            📧 ${formData.email}<br>
+            📅 Nacimiento: ${formData.birthdate}<br>
+            🏠 ${formData.address.locality}, ${formData.address.region}<br>
+            🔒 <strong>Verificaciones de edad calculadas por el backend (seguro)</strong>
+          </div>
           <div class="qr-container" id="${qrId}"></div>
-          <p class="small">Escanea el QR arriba con tu wallet (Inji)</p>
+          <p class="small">Escanea el QR arriba con tu wallet</p>
           <details><summary>Ver contenido (offer URI)</summary><pre>${offer}</pre></details>
         `;
         
@@ -124,7 +479,7 @@
         out.innerHTML = `
           <p class="status ok">✅ QR listo para verificación (state: <code>${state}</code>)</p>
           <div class="qr-container" id="${qrId}"></div>
-          <p class="small">Escanea el QR arriba con tu wallet (Inji) para presentar la credencial</p>
+          <p class="small">Escanea el QR arriba con tu wallet para presentar la credencial</p>
           <details><summary>Ver contenido (authorization request)</summary><pre>${authRequest}</pre></details>
         `;
         
@@ -145,7 +500,62 @@
               // Try to fetch portal session info
               try {
                 const meData = await getJSON("/demo/me");
-                me.innerHTML = `<details open><summary>Sesión del portal</summary><pre>${JSON.stringify(meData, null, 2)}</pre></details>`;
+                me.innerHTML = `
+                  <button id="btnDetails_${state}" style="margin-top:8px;">🔍 Ver Detalles Técnicos del Verifier</button>
+                  <div id="detailsOut_${state}" style="display:none;"></div>
+                `;
+
+                let detailsVisible = false;
+                let detailsLoaded = false;
+
+                // Add event listener for technical details toggle button
+                document.getElementById(`btnDetails_${state}`).addEventListener("click", async () => {
+                  const detailsDiv = document.getElementById(`detailsOut_${state}`);
+                  const button = document.getElementById(`btnDetails_${state}`);
+                  
+                  if (!detailsVisible) {
+                    // Mostrar detalles
+                    button.textContent = "🔼 Ocultar Detalles Técnicos";
+                    
+                    if (!detailsLoaded) {
+                      detailsDiv.innerHTML = "<p class='status wait'>Consultando verifier...</p>";
+                      detailsDiv.style.display = "block";
+                      
+                      try {
+                        const detailsData = await getJSON(`/demo/verifier-details?session_id=${state}`);
+                        detailsDiv.innerHTML = `
+                          <details open style="margin-top:8px;">
+                            <summary>📊 Información Técnica Walt.id Verifier</summary>
+                            <div style="margin:8px 0;">
+                              <strong>Resumen de Sesión:</strong>
+                              <pre style="margin:4px 0; font-size:12px;">${JSON.stringify(detailsData.session_summary, null, 2)}</pre>
+                            </div>
+                            <div style="margin:8px 0;">
+                              <strong>Detalles del Verifier:</strong>
+                              <pre style="margin:4px 0; font-size:12px;">${JSON.stringify(detailsData.verifier_details, null, 2)}</pre>
+                            </div>
+                            <div style="margin:4px 0;">
+                              <small style="color:#666;">Endpoint: ${detailsData.metadata.walt_id_endpoint} | Consultado: ${detailsData.metadata.query_timestamp}</small>
+                            </div>
+                          </details>
+                        `;
+                        detailsLoaded = true;
+                      } catch (e) {
+                        detailsDiv.innerHTML = `<p class="status bad">Error consultando detalles: ${e.message}</p>`;
+                      }
+                    } else {
+                      detailsDiv.style.display = "block";
+                    }
+                    detailsVisible = true;
+                    
+                  } else {
+                    // Ocultar detalles
+                    button.textContent = "🔍 Ver Detalles Técnicos del Verifier";
+                    detailsDiv.style.display = "none";
+                    detailsVisible = false;
+                  }
+                });
+
               } catch (e) {
                 me.innerHTML = `<p class="small">Sesión creada, pero /demo/me no respondió (posible cookie Secure en HTTP local).</p>`;
               }

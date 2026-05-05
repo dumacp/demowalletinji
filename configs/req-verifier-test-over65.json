@@ -1,0 +1,48 @@
+{
+  "openId4VPProfile": "DEFAULT",
+  "request_credentials": [
+    {
+      "format": "vc+sd-jwt",
+      "vct": "identity_credential",
+      "input_descriptor": {
+        "id": "identity_credential",
+        "format": {
+          "vc+sd-jwt": {
+            "sd-jwt_alg_values": ["EdDSA", "ES256"]
+          }
+        },
+        "constraints": {
+          "limit_disclosure": "required",
+          "fields": [
+            {
+              "path": ["$.is_over_65"],
+              "filter": {
+                  "type": "boolean",
+                  "const": true
+              },
+              "purpose": "PRUEBA: Solo mayores de 65 años permitidos"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "vp_policies": [],
+  "vc_policies": [
+    {
+      "policy": "signature",
+      "description": "Verify cryptographic signature of credential"
+    },
+    {
+      "policy": "allowed-issuer",
+      "args": [
+        "did:web:devportal.nebulae.com.co:issuers:devportal"
+      ],
+      "description": "Only accept credentials from trusted issuers"
+    }
+  ],
+  "presentationID": "test_over65_$RANDOM_ID",
+  "metadata": {
+    "description": "TEST: Only accept credentials where is_over_65 = true"
+  }
+}

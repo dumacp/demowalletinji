@@ -1,0 +1,44 @@
+# Build artifacts
+demo-portal*
+portal-enhanced
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Temporary files
+*.tmp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/
+
+# Temporary credential files
+configs/temp-req-*.json
+
+# Chat history
+chat*.json
+
+# OS files
+.DS_Store
+Thumbs.db

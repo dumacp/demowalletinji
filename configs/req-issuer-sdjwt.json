@@ -54,6 +54,9 @@
       },
       "email": {
         "sd": true
+      },
+      "is_over_65": {
+        "sd": true
       }
     },
     "decoyMode": "NONE",
